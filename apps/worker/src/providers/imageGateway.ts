@@ -62,13 +62,15 @@ export async function callImageUpstream(
   return { res, requestId };
 }
 
-/** 发起上游请求并把响应体透传到 R2;统一使用分块对象(跨环境可移植)。 */
+/** 发起上游请求并把响应体透传到 R2;统一使用分块对象(跨环境可移植),总量 64MB 上限。 */
 export async function startImageUpstream(
   env: Env,
   opts: { path: string; init: RequestInit; rawPrefix: string },
 ): Promise<UpstreamCapture> {
   const { res, requestId } = await callImageUpstream(env, opts.path, opts.init);
-  const out = await writeStreamToChunks(env, opts.rawPrefix, res.body!, RAW_CAPTURE_CHUNK);
+  const out = await writeStreamToChunks(env, opts.rawPrefix, res.body!, RAW_CAPTURE_CHUNK, {
+    totalCap: 64 * 1024 * 1024,
+  });
   return { requestId, capture: { kind: "chunks", prefix: out.prefix, chunks: out.chunks, total: out.total } };
 }
 
@@ -125,7 +127,10 @@ export async function captureUrlToChunks(env: Env, url: string, prefix: string):
       if (value) controller.enqueue(value);
     },
   });
-  const out = await writeStreamToChunks(env, prefix, tee, RAW_CAPTURE_CHUNK);
+  // P0.5:无 Content-Length 也在流式读取中强制 25MB 上限
+  const out = await writeStreamToChunks(env, prefix, tee, RAW_CAPTURE_CHUNK, {
+    totalCap: MAX_REMOTE_IMAGE_BYTES,
+  });
   return { chunks: out.chunks, total: out.total, mime };
 }
 

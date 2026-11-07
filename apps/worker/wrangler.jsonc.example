@@ -22,7 +22,9 @@
     {
       "binding": "DB",
       "database_name": "bns-elab-<grade>-db",
-      "database_id": "<在下方「创建资源」步骤后填入>"
+      "database_id": "<在下方「创建资源」步骤后填入>",
+      // P0.7:迁移 SQL 在仓库根 db/migrations(而非 wrangler 默认的 migrations/)
+      "migrations_dir": "../../db/migrations"
     }
   ],
   "r2_buckets": [

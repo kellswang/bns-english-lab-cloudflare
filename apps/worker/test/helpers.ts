@@ -45,7 +45,7 @@ export function installFixedLengthStreamPolyfill(): void {
   };
 }
 
-export async function makeTestEnv() {
+export async function makeTestEnv(overrides: Record<string, string> = {}) {
   const proxy = await getPlatformProxy<Record<string, unknown>>({
     configPath: "./wrangler.test.jsonc",
     persist: false, // 每次全新内存实例:测试间互不污染
@@ -56,6 +56,17 @@ export async function makeTestEnv() {
   env.RESEND_API_KEY = "";
   env.AI_API_KEY = "test-ai-key";
   env.CHAT_API_KEY = "test-chat-key";
+    // test-var pinning: .dev.vars(为 E2E 创建)会覆盖 jsonc vars,这里显式钉住测试依赖的值
+    env.APP_ENV = "development";
+    env.GRADE_ID = "gtest";
+    env.GRADE_LABEL = "测试年级";
+    env.EMAIL_DOMAIN = "example.edu";
+    env.IMAGE_DAILY_LIMIT_PER_USER = "50";
+    env.PRICE_PER_IMAGE_USD = "0.02";
+    env.ADMIN_EMAILS = "admin@example.edu";
+  for (const [k, v] of Object.entries(overrides)) {
+    (env as unknown as Record<string, unknown>)[k] = v;
+  }
   // 测试不使用真实队列投递(miniflare 无 consumer 时投递会失败):
   // 队列消息由测试手动泵送到同一处理函数 handleQueueBatch,与生产行为一致。
   (env as unknown as Record<string, unknown>).GEN = {
@@ -83,9 +94,9 @@ export async function makeTestEnv() {
 export function req(
   env: Env,
   path: string,
-  init: { method?: string; body?: unknown; cookie?: string; form?: FormData; ip?: string } = {},
+  init: { method?: string; body?: unknown; cookie?: string; form?: FormData; ip?: string; headers?: Record<string, string> } = {},
 ): Request {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...(init.headers || {}) };
   if (init.body !== undefined && !init.form) headers["content-type"] = "application/json";
   if (init.cookie) headers["cookie"] = init.cookie;
   if (init.ip) headers["cf-connecting-ip"] = init.ip;

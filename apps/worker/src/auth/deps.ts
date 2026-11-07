@@ -50,9 +50,24 @@ export async function getOptionalUser(c: Context<{ Bindings: Env }>): Promise<Ap
         "SELECT id, email, display_name, role, status, created_at, last_login_at FROM users WHERE id = ?",
         payload.sub,
       );
-      if (user && user.status === "suspended") {
-        // 停用立即拒绝(与原 get_current_user 一致)
-        throw new HttpError(403, "账号已被停用,请联系管理员");
+      if (user) {
+        // P0.6 账号停用
+        if (user.status === "suspended") {
+          throw new HttpError(403, "账号已被停用,请联系管理员");
+        }
+        // P0.6 白名单即时撤销:即使 users.status 仍为 active,invite 被禁用立即拒绝。
+        // 会话有效期内每次请求都查(1 行读,免费额度内),不做缓存延迟。
+        if (user.role !== "admin") {
+          const invite = await one<{ status: string }>(
+            env.DB,
+            "SELECT status FROM teacher_invites WHERE email = ?",
+            user.email,
+          );
+          // 名单被移除或停用 → 立即失效(与登录时语义一致)
+          if (!invite || invite.status !== "active") {
+            throw new HttpError(403, "该账号访问权限已停用,请联系管理员");
+          }
+        }
       }
     }
   }

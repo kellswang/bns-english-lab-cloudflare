@@ -270,7 +270,7 @@ chatRoutes.post("/chat/conversations/:convId/messages", async (c) => {
 
   const attIdSet = new Set(history.flatMap((m) => m.attachments.map((a) => a.id)));
   const attachmentMap = new Map<string, { id: string; kind: "image" | "pdf" | "docx" | "text"; filename: string; extracted_text: string | null }>();
-  const imagesById = new Map<string, { mime: string; b64: string }>();
+  let getImagesById: (id: string) => Promise<{ mime: string; b64: string } | null> = async () => null;
   if (attIdSet.size) {
     const rows = await all<{ id: string; kind: string; filename: string; extracted_text: string | null; rel_path: string; content_type: string }>(
       c.env.DB, `SELECT id, kind, filename, extracted_text, rel_path, content_type FROM chat_attachments WHERE id IN (${[...attIdSet].map(() => "?").join(",")})`,
@@ -278,14 +278,20 @@ chatRoutes.post("/chat/conversations/:convId/messages", async (c) => {
     );
     for (const r of rows) {
       attachmentMap.set(r.id, { id: r.id, kind: r.kind as never, filename: r.filename, extracted_text: r.extracted_text });
-      if (r.kind === "image") {
-        const obj = await c.env.MEDIA.get(r.rel_path);
-        if (obj) {
-          const buf = await obj.arrayBuffer();
-          imagesById.set(r.id, { mime: r.content_type || "image/png", b64: arrayBufferToBase64(buf) });
-        }
-      }
     }
+    // P1.3: 图片不再批量拉取; buildChatRequest 只为选中消息的图片附件发起 R2 读取
+    const imagesById = new Map<string, { mime: string; b64: string }>();
+    getImagesById = async (id: string): Promise<{ mime: string; b64: string } | null> => {
+      if (imagesById.has(id)) return imagesById.get(id)!;
+      const row = rows.find((x) => x.id === id);
+      if (!row || row.kind !== "image") return null;
+      const obj = await c.env.MEDIA.get(row.rel_path);
+      if (!obj) return null;
+      const buf = await obj.arrayBuffer();
+      const item = { mime: row.content_type || "image/png", b64: arrayBufferToBase64(buf) };
+      imagesById.set(id, item);
+      return item;
+    };
   }
 
   // 摘要仅在覆盖前缀属于当前分支时可用
@@ -294,7 +300,7 @@ chatRoutes.post("/chat/conversations/:convId/messages", async (c) => {
 
   let req;
   try {
-    req = buildChatRequest({ modelId: model.id, thinking: thinkingLevel, history, attachmentMap, summary, imagesById });
+    req = await buildChatRequest({ modelId: model.id, thinking: thinkingLevel, history, attachmentMap, summary, getImagesById });
   } catch (e) {
     if (e instanceof ProviderError) throw new HttpError(400, e.message);
     throw e;
@@ -322,7 +328,7 @@ chatRoutes.post("/chat/conversations/:convId/messages", async (c) => {
     }
     // 摘要后重建请求
     try {
-      req = buildChatRequest({ modelId: model.id, thinking: thinkingLevel, history, attachmentMap, summary, imagesById });
+      req = await buildChatRequest({ modelId: model.id, thinking: thinkingLevel, history, attachmentMap, summary, getImagesById });
     } catch (e) {
       if (e instanceof ProviderError) throw new HttpError(400, e.message);
       throw e;

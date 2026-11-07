@@ -99,15 +99,16 @@ export function fitText(text: string, maxTokens: number): string {
   return text.slice(0, lo) + "\n\n【内容过长,已截断,仅前半部分进入本次上下文】";
 }
 
-export function buildChatRequest(opts: {
+export async function buildChatRequest(opts: {
   modelId: string;
   thinking: ThinkingLevel;
   history: HistoryMsg[];
   attachmentMap: Map<string, DbAttachment>;
   summary: string | null;
-  imagesById: Map<string, { mime: string; b64: string }>;
+  /** P1.3: 惰性取图 - 只为选中消息的图片附件发起 R2 读取 + base64 */
+  getImagesById: (id: string) => Promise<{ mime: string; b64: string } | null>;
   maxOutput?: number;
-}): ChatRequest {
+}): Promise<ChatRequest> {
   const model = getChatModel(opts.modelId);
   if (!model) throw new ProviderError("模型不在允许清单内");
   if (model.status !== "ok") {
@@ -122,8 +123,10 @@ export function buildChatRequest(opts: {
     let text = m.content || "";
     for (const a of m.attachments || []) {
       if (a.kind === "image") {
-        const img = opts.imagesById.get(a.id);
-        if (img && m.role === "user") images.push(img);
+        if (m.role === "user") {
+          const img = await opts.getImagesById(a.id);
+          if (img) images.push(img);
+        }
       } else {
         const row = opts.attachmentMap.get(a.id);
         if (row?.extracted_text) text += `\n\n【附件:${row.filename}】\n${row.extracted_text}`;

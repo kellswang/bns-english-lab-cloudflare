@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "dev/**"]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Worker TypeScript check
+        run: npx tsc --noEmit
+        working-directory: apps/worker
+
+      - name: Worker tests (Vitest, local workerd)
+        run: npx vitest run
+        working-directory: apps/worker
+
+      - name: Web type check
+        run: npm run type-check
+        working-directory: apps/web
+
+      - name: Web build
+        run: npm run build
+        working-directory: apps/web
+
+      - name: Markdown regression
+        run: npm run test:markdown
+        working-directory: apps/web
+
+      - name: Sensitive-info scan (no real names / keys / school domain)
+        run: node scripts/predeploy-check.mjs
+
+      - name: Wrangler config dry-run (no deploy, no credentials)
+        run: npx wrangler deploy --dry-run --outdir=dist-check
+        working-directory: apps/worker
+
+      - name: Upload worker type artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs
+          path: |
+            apps/worker/dist-check
+          if-no-files-found: ignore

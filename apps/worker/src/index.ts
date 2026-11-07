@@ -9,6 +9,7 @@
 import { Hono } from "hono";
 import type { Env, GenerationMessage } from "./types";
 import { errorResponse } from "./utils/http";
+import { securityMiddleware } from "./middleware/security";
 import { authRoutes } from "./routes/auth";
 import { generationRoutes } from "./routes/generation";
 import { projectRoutes } from "./routes/projects";
@@ -22,6 +23,11 @@ import { sweepQueued, recoverStuckJobs, cleanupExpired } from "./cron/sweep";
 const app = new Hono<{ Bindings: Env }>();
 
 app.onError((err, c) => errorResponse(err));
+
+// ---- 安全层(P0.1):必须先于全部路由注册 ----
+// 写方法:Fetch Metadata + Origin 同源校验(URL 解析/端口归一化);
+// 所有响应(含 GET/错误/SSE/下载)追加安全头。
+app.use("/api/*", securityMiddleware);
 
 // ---- 健康检查(与原 /api/v1/health 语义一致:DB 可用才算健康) ----
 app.get("/api/v1/health", async (c) => {
@@ -56,25 +62,6 @@ app.route("/api/v1", chatRoutes);
 // 未注册 / 已下线的 API 一律 404(与原 main.api_not_found 一致)
 app.all("/api/*", (c) => c.json({ detail: "Not Found" }, 404));
 
-// ---- 安全层:Origin 校验(写方法)+ 安全响应头 ----
-app.use("*", async (c, next) => {
-  const method = c.req.method;
-  if (["POST", "PATCH", "DELETE", "PUT"].includes(method)) {
-    const origin = c.req.header("origin");
-    if (origin) {
-      const host = (c.req.header("host") || new URL(c.req.url).host).toLowerCase();
-      const originHost = new URL(origin).host.toLowerCase();
-      if (originHost && originHost !== host) {
-        return c.json({ detail: "跨站请求被拒绝" }, 403);
-      }
-    }
-  }
-  await next();
-  c.res.headers.set("x-content-type-options", "nosniff");
-  c.res.headers.set("referrer-policy", "same-origin");
-  c.res.headers.set("x-robots-tag", "noindex, nofollow");
-  c.res.headers.set("content-security-policy", "frame-ancestors 'self'");
-});
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {

@@ -44,7 +44,7 @@ async function pumpUntilTerminal(jobId: string, max = 200): Promise<string> {
 }
 
 beforeAll(async () => {
-  ctx = await makeTestCtx();
+  ctx = await makeTestCtx({ IMAGE_DAILY_LIMIT_PER_USER: "3" });
   upstream = await startMockUpstream();
   ctx.env.AI_BASE_URL = upstream.url + "/v1";
   await seedInvite(ctx.env, EMAIL, "生成教师");

@@ -7,8 +7,8 @@ export interface TestCtx {
   dispose: () => Promise<void>;
 }
 
-export async function makeTestCtx(): Promise<TestCtx & { call: typeof call; login: typeof login; seedInvite: typeof seedInvite }> {
-  const { env, dispose } = await makeTestEnv();
+export async function makeTestCtx(overrides: Record<string, string> = {}): Promise<TestCtx & { call: typeof call; login: typeof login; seedInvite: typeof seedInvite }> {
+  const { env, dispose } = await makeTestEnv(overrides);
   return { env, dispose, call, login, seedInvite };
 }
 export { makeTestEnv, call, login, seedInvite };

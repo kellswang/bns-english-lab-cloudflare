@@ -26,13 +26,15 @@ export const META_BYTES_CAP = 1_000_000; // 重建 JSON 的字节上限(正常�
 
 const MARKER = new TextEncoder().encode(SCAN_MARKER);
 
-/** 顺序读流并落成分块对象;返回 {prefix, chunks, total}。CPU≈纯 I/O。 */
+/** 顺序读流并落成分块对象;totalCap 超限抛错(即使无 Content-Length 也在流中强制执行)。 */
 export async function writeStreamToChunks(
   env: { MEDIA: R2Bucket },
   prefix: string,
   body: ReadableStream<Uint8Array>,
   maxBytes: number,
+  opts: { totalCap?: number } = {},
 ): Promise<{ prefix: string; chunks: number; total: number }> {
+  const cap = opts.totalCap ?? Infinity;
   const reader = body.getReader();
   let idx = 0;
   let total = 0;
@@ -49,6 +51,9 @@ export async function writeStreamToChunks(
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
+      if (total + bufLen + value.byteLength > cap) {
+        throw new Error(`上游响应超过大小上限(${cap} 字节)`);
+      }
       if (bufLen + value.byteLength > maxBytes) {
         await flush();
       }
@@ -230,13 +235,10 @@ export async function scanWindow(
   const pushMetaBytes = (from: number, to: number) => {
     for (let k = from; k < to; k++) pushMetaByteSafe(data[k]!);
   };
+  // P1.2 修复:marker(`"b64_json":"`)自带值的开引号,其后只需一个闭引号即得
+  // `"b64_json":""`(空串占位,JSON 合法)。b64 值结束处的引号不再追加。
   const pushMarker = () => {
-    // '"b64_json":"' 的 marker 字节 + 开引号 + 闭引号(空串),JSON 保持合法
     for (const b of MARKER) pushMetaByteSafe(b);
-    pushMetaByteSafe(0x22);
-    pushMetaByteSafe(0x22);
-  };
-  const pushMarkerClose = () => {
     pushMetaByteSafe(0x22);
   };
 
@@ -280,7 +282,6 @@ export async function scanWindow(
         for (let k = i; k < end; k++) st.b64Buf.push(data[k]!);
         st.b64Total += end - i;
         i = end + 1;
-        pushMarkerClose();
         st.mode = "scan";
         await putB64Chunk(env, st);
       }
@@ -324,4 +325,47 @@ export async function finishScan(
   }
   if (st.metaTruncated) payload.__meta_truncated = true;
   return { b64Chunks: st.b64ChunkIdx, b64Bytes: st.b64Total, tailPadding, payload };
+}
+
+/** P0.5: orphan tmp chunk cleanup (idempotent). */
+export async function deleteStaleTmpObjects(
+  env: { MEDIA: R2Bucket },
+  prefixes: string[],
+  maxAgeMs: number,
+): Promise<number> {
+  const cutoff = Date.now() - maxAgeMs;
+  let deleted = 0;
+  for (const prefix of prefixes) {
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await env.MEDIA.list({ prefix, cursor });
+      const stale = (page.objects || []).filter((o) => o.uploaded.getTime() < cutoff).map((o) => o.key);
+      if (stale.length) {
+        await env.MEDIA.delete(stale);
+        deleted += stale.length;
+      }
+      if (!page.truncated || !page.cursor) break;
+      cursor = page.cursor;
+    }
+  }
+  return deleted;
+}
+
+/** tmp object stats (observability). */
+export async function statTmpObjects(
+  env: { MEDIA: R2Bucket },
+  prefixes: string[],
+): Promise<{ count: number; bytes: number }> {
+  let count = 0;
+  let bytes = 0;
+  for (const prefix of prefixes) {
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await env.MEDIA.list({ prefix, cursor });
+      for (const o of page.objects || []) { count++; bytes += o.size; }
+      if (!page.truncated || !page.cursor) break;
+      cursor = page.cursor;
+    }
+  }
+  return { count, bytes };
 }
