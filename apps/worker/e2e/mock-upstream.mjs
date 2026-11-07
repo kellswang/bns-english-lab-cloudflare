@@ -26,5 +26,26 @@ createServer((req, res) => {
     });
     return;
   }
+  if (url.startsWith("/v1/responses")) {
+    // OpenAI Responses 协议的 SSE mock(对话)
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      res.writeHead(200, { "content-type": "text/event-stream", "x-request-id": "e2e-chat-rid" });
+      const frames = [
+        'data: {"type":"response.created","response":{"id":"resp_e2e","model":"gpt-6.1-sol"}}',
+        'data: {"type":"response.output_text.delta","delta":"这是"}',
+        'data: {"type":"response.output_text.delta","delta":"E2E mock 回答。"}',
+        'data: {"type":"response.completed","response":{"usage":{"input_tokens":10,"output_tokens":4,"total_tokens":14}}}',
+        "data: [DONE]",
+      ];
+      let i = 0;
+      const timer = setInterval(() => {
+        if (i < frames.length) { res.write(frames[i] + "\n\n"); i++; }
+        else { clearInterval(timer); res.end(); }
+      }, 120);
+    });
+    return;
+  }
   res.writeHead(404); res.end("not found");
-}).listen(8791, "127.0.0.1", () => console.log("E2E mock upstream on http://127.0.0.1:8791"));
+}).listen(8791, "0.0.0.0", () => console.log("E2E mock upstream on http://127.0.0.1:8791"));

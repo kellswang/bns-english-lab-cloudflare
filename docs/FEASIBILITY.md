@@ -9,20 +9,31 @@
 提供真实的 D1(SQLite)、R2 对象存储、Queue producer 绑定。测试代码见
 `apps/worker/test/`(67 项断言)与 `spikes/gateA-bigpayload.mts`。
 
-## 闸门 A|图像生成与存储 — **本地通过 / 线上未验证**
+## 闸门 A|图像生成与存储 — **本地通过(流水线化) / 线上未验证**
 
-| 验证点 | 结果 | 证据 |
-|---|---|---|
-| 大体积 b64 响应解码 → R2 写入 → D1 版本落库 | 2/5/10/20 MB 全部成功,字节精确一致,耗时 0.6~1.9s | `spikes/gateA-bigpayload.mts` 输出 |
-| R2 流式写入约束 | 实现 FixedLengthStream 路径;测试覆盖 ArrayBuffer 路径 | `src/storage/r2.ts` |
-| 上游 URL 模式 | 仅允许 AI_BASE_URL 同域 + https + 禁止重定向 + 25MB 上限 | `src/providers/imageGateway.ts`;SSRF 测试在单元层 |
-| 15 画幅 / 原生 2K | 逐项参数化测试通过(2048×2048、1456×2048、2048×1536、2048×1152…) | `test/unit/sizes.test.ts` 19 项 |
-| 队列状态机(queued→submitted→running→succeeded;失败/uncertain/pending_save) | 集成测试:成功产出版本 V1;重复投递不产第二个版本;上游 5xx → uncertain 且只调一次上游 | `test/integration/generation.test.ts` |
-| 缩略图 | **降级方案**:无 Pillow,服务端不做像素处理;缩略图由浏览器端生成后经受控接口上传(规划),缺失时 thumb 接口回退原图 | `src/routes/files.ts`;风险见下 |
-| **风险(必须线上实测)** | ① Workers Free **10ms CPU/请求**:20MB 级 JSON 解析 + base64 解码在本地 workerd 耗时秒级,但 workerd 本地无 CPU 限额;线上若超 10ms 会失败,需 Queues consumer 实测(消费器同样受 CPU 限额)与可能的分块处理。② 128MB 内存:base64 字符串 ≈ 字节的 1.37 倍,20MB 图 ≈ 47MB 峰值(字符串+解码缓冲),本地未触顶;更大尺寸需实测。③ 免费 CPU 额度对 `/images/edits` multipart 大原图纸上传的影响 | 待 Cloudflare Free 授权实测 |
+**P0 重大更新(2026-11-07)**:图像交付重构为**字节级分阶段流水线**,
+不再有任何单次调用处理整图:
 
-**结论**:逻辑与数据通路在本地 workerd 全部可行;**线上 CPU 限额是唯一硬未知项**,
-属"无法在本地证明/证伪"的部分。若线上实测失败,备选路线见文末。
+```
+start(响应体透传 R2 分块,CPU≈I/O)
+  → scan(1MB 字节级窗口扫 marker,b64 字节直拷分块对象)
+  → decode(500K 字符 atob 分片,每片实测 ≈5-8ms Node 量级)
+  → assemble(分块串流合成,纯 I/O)
+```
+
+- spike(gateA-bigpayload.mts):2/5/10/20MB 全链路字节一致,队列调用 5/9/15/29 次;
+- 对照:旧实现(整体 JSON.parse + atob)在 7M 字符时实测 122ms CPU —— 免费套餐必挂,
+  这就是必须流水线化的实证;
+- URL 模式:上游返回 url 时全程无 base64,同源白名单 + 分块拷贝(CPU≈I/O);
+- 小图(≤500K b64 字符):扫描完成后单次解码快速路径。
+
+| 验证点 | 结果 |
+|---|---|
+| 2/5/10/20MB 流水线端到端字节一致 | ✅ 本地 workerd |
+| 三路径交付(inline/staged/url)集成测试 | ✅ |
+| R2 分块合成(流式 + Node 回退) | ✅ |
+| **每阶段真实 CPU(10ms 限额)** | **待线上实测** — `spikes/live-cpu-probe/` 已备好,含三通道(HTTP/Queue/Cron)采集手册与判定表 |
+| 内存峰值 | 单次调用仅 ~1-2MB 切片;线上峰值待观测 |
 
 ## 闸门 B|原图编辑真实性 — **本地通过(mock 上游)/ 真实上游未验证**
 
@@ -44,16 +55,14 @@
 - **未验证**:真实 120 秒级长流在 Workers Free 的 CPU 计费(流式等待上游不计 CPU,
   但分块 JSON 解析计费)。
 
-## 闸门 D|文档和图片附件 — **部分本地通过 / 浏览器端解析未实现**
+## 闸门 D|文档和图片附件 — **已实现(浏览器端解析)/ 线上未验证**
 
-已实现(服务端):魔数嗅探(PNG/JPEG/WebP/PDF/ZIP)、20MB 上限、40MP 头部尺寸预检、
-R2 私有存储 + 会话归属下载、文本 60,000 字符截断标记、孤儿对象清理。
-**浏览器端 PDF/DOCX 正文抽取(PDF.js / mammoth)尚未实现**——当前方案为客户端随表单提交
-`extracted_text`(服务端限长、记录 text_truncated)。这是与原项目(服务端 pypdf/python-docx)
-的一个**已声明的差距**:在浏览器端实现完成前,PDF/DOCX 正文抽取依赖前端解析器上线。
-扫描件无文本的诚实提示逻辑已保留(不假装读过)。
-EXIF 清除:参考图由浏览器端重编码(规划);当前服务端只做魔数校验,不重编码。
-**此项为迁移的核心未完成项之一**,不宣称功能等价。
+P1 完成:PDF/DOCX/TXT 正文在**浏览器端**抽取(pdf.js 逐页、mammoth、上限 60 页 /
+60,000 字符,截断如实标记 text_truncated),随表单提交;服务端限长并存储。
+图片附件经 canvas 重编码(EXIF/GPS 不离开浏览器),对话附件缩到模型输入长边 1568px,
+参考图保持原分辨率(canvas 上限约 24MP,超出给可读错误)。
+扫描件无文本时服务端如实提示,不假装读过。
+**待验证**:浏览器解析在真实设备上的表现(pdf.js 大文件);线上端到端。
 
 ## 闸门 E|验证码和会话 — **本地通过**
 
