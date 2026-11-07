@@ -1,10 +1,15 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '../api/client'
+import { parseFileForUpload, ParseError } from '../utils/attachParse'
 import type { Job, MessageItem, ModelSpec, Project, SizePreset, Usage, Version } from '../types'
 
-const POLL_MS = 1600
-const POLL_MAX = 180   // 约 5 分钟
+// P1.3:自适应轮询替代原 1.6s 固定轮询 —— 起步 3s、×1.4 退避、上限 15s,
+// 页面隐藏时暂停,回到前台立即补一次;已完成即终止。
+const POLL_START_MS = 3000
+const POLL_MAX_MS = 15000
+const POLL_BACKOFF = 1.4
+const POLL_MAX_TICKS = 90   // 足够覆盖 20 分钟级生成
 
 /** 幂等键：同一次用户操作（双击、失败后立刻重试）复用同一个值 */
 function newRequestId(): string {
@@ -149,6 +154,44 @@ export const useWorkspace = defineStore('workspace', () => {
     const d = await api.get<{ items: Version[] }>(`/api/v1/projects/${pid}/versions`)
     if (currentId.value !== pid) return
     versions.value = d.items
+    void ensureThumbs(pid)
+  }
+
+  // P1.2:缩略图浏览器端生成 —— 服务端不做像素处理(免费 CPU 约束)。
+  // 只处理 has_thumb=false 的版本,每次最多补 8 张,生成 420px JPEG 后 PUT 回服务端。
+  const thumbQueue = new Set<string>()
+  async function ensureThumbs(pid: string) {
+    const need = versions.value.filter((v) => !v.has_thumb && !thumbQueue.has(v.id)).slice(0, 8)
+    for (const v of need) {
+      thumbQueue.add(v.id)
+      try {
+        const res = await fetch(`/api/v1/versions/${v.id}/image`, { credentials: 'same-origin' })
+        if (!res.ok) continue
+        const blob = await res.blob()
+        const bitmap = await createImageBitmap(blob)
+        try {
+          const w = Math.min(420, bitmap.width)
+          const h = Math.round(bitmap.height * (w / bitmap.width))
+          const canvas = document.createElement('canvas')
+          canvas.width = w
+          canvas.height = h
+          const ctx = canvas.getContext('2d')
+          if (!ctx) continue
+          ctx.drawImage(bitmap, 0, 0, w, h)
+          const jpeg = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.84))
+          if (!jpeg || jpeg.size > 300 * 1024) continue
+          await fetch(`/api/v1/versions/${v.id}/thumb`, {
+            method: 'PUT', credentials: 'same-origin', body: jpeg,
+          })
+          const i = versions.value.findIndex((x) => x.id === v.id)
+          if (i >= 0) versions.value[i] = { ...versions.value[i]!, has_thumb: true }
+        } finally {
+          bitmap.close?.()
+        }
+      } catch {
+        // 缩略图失败只降级:thumb 接口会回退原图
+      }
+    }
   }
 
   function selectVersion(id: string) {
@@ -178,9 +221,12 @@ export const useWorkspace = defineStore('workspace', () => {
 
   async function uploadReference(file: File): Promise<{ id: string; url: string; filename: string }> {
     const pid = await ensureProject()
+    // 浏览器端重编码为 PNG:EXIF/GPS 不离开浏览器;像素超限给出可读错误
+    const parsed = await parseFileForUpload(file, 'reference')
     const form = new FormData()
     form.append('project_id', pid)
-    form.append('file', file)
+    const outName = /\.png$/i.test(file.name) ? file.name : file.name.replace(/\.[^.]+$/, '') + '.png'
+    form.append('file', parsed.blob, outName)
     return api.upload(`/api/v1/uploads`, form)
   }
 
@@ -248,6 +294,7 @@ export const useWorkspace = defineStore('workspace', () => {
     polling.add(jobId)
     return new Promise((resolve) => {
       let ticks = 0
+      let delay = POLL_START_MS
       const done = () => { polling.delete(jobId); resolve() }
       const tick = async () => {
         ticks += 1
@@ -279,14 +326,24 @@ export const useWorkspace = defineStore('workspace', () => {
           done()
           return
         }
-        if (ticks > POLL_MAX) {
+        if (ticks > POLL_MAX_TICKS) {
           error.value = '生成超时，请稍后刷新项目查看结果'
           done()
           return
         }
-        window.setTimeout(tick, POLL_MS)
+        // 页面隐藏:暂停轮询(不消耗请求),回到前台立即补查
+        if (document.hidden) {
+          const onResume = () => {
+            document.removeEventListener('visibilitychange', onResume)
+            if (currentId.value === pid && polling.has(jobId)) window.setTimeout(tick, 300)
+          }
+          document.addEventListener('visibilitychange', onResume)
+          return
+        }
+        delay = Math.min(POLL_MAX_MS, Math.round(delay * POLL_BACKOFF))
+        window.setTimeout(tick, delay)
       }
-      window.setTimeout(tick, POLL_MS)
+      window.setTimeout(tick, delay)
     })
   }
 

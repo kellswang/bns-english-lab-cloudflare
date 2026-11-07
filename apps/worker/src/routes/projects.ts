@@ -168,6 +168,7 @@ export function versionOut(v: VersionRow): Record<string, unknown> {
     height: v.height,
     size_bytes: v.size_bytes,
     is_starred: Number(v.is_starred) > 0,
+    has_thumb: Boolean(v.thumb_path),
     created_at: naiveUtc(v.created_at),
     url: `/api/v1/versions/${v.id}/image`,
     thumb_url: `/api/v1/versions/${v.id}/thumb`,

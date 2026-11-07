@@ -1,4 +1,4 @@
-export interface User {
+﻿export interface User {
   id: string
   email: string
   display_name: string
@@ -57,6 +57,7 @@ export interface Version {
   height: number | null
   size_bytes: number
   is_starred: boolean
+  has_thumb?: boolean
   created_at: string | null
   url: string
   thumb_url: string

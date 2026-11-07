@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { api, ApiError } from '../api/client'
+import { parseFileForUpload, ParseError } from '../utils/attachParse'
 import type {
   ChatAttachmentMeta, ChatConversationDetail, ChatConversationSummary,
   ChatMessageItem, ChatModel, ChatModelsResponse, ChatThinkingLevel,
@@ -165,8 +166,16 @@ export const useChat = defineStore('chat', () => {
   async function uploadAttachment(file: File): Promise<ChatAttachmentMeta | null> {
     let id = currentId.value
     if (!id) id = await createConversation()
+    // 浏览器端解析:PDF/DOCX/TXT 抽正文、图片去 EXIF 并缩到模型输入尺寸
+    const parsed = await parseFileForUpload(file, 'chat')
     const form = new FormData()
-    form.append('file', file)
+    const outName = parsed.contentType === 'image/png' && /\.jpe?g$|\.webp$/i.test(file.name)
+      ? file.name.replace(/\.[^.]+$/, '') + '.png'
+      : file.name
+    form.append('file', parsed.blob, outName)
+    if (parsed.extractedText !== null) form.append('extracted_text', parsed.extractedText)
+    if (parsed.pageCount !== null) form.append('page_count', String(parsed.pageCount))
+    form.append('text_truncated', parsed.textTruncated ? '1' : '0')
     const meta = await api.upload<ChatAttachmentMeta>(
       `/api/v1/chat/conversations/${id}/attachments`, form)
     attachments.value.push(meta)
