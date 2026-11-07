@@ -78,7 +78,7 @@ function onRememberChange() {
 }
 
 const contactEmail = 'kellswang@hotmail.com'
-const mailto = `mailto:${contactEmail}?subject=${encodeURIComponent('关于BNS四年级英语教研平台的咨询')}`
+const mailto = `mailto:${contactEmail}?subject=${encodeURIComponent('关于英语教研平台的咨询')}`
 
 function shake() {
   shaking.value = true
@@ -265,7 +265,7 @@ function onSubmit() {
     <div class="gate-side">
       <form class="gate-form" :class="{ 'gate-shake': shaking }" @submit.prevent="onSubmit">
         <p class="gate-eyebrow">四年级英语教研组</p>
-        <h1>BNS四年级英语教研平台</h1>
+        <h1>{{ auth.appName || '英语教研平台' }}</h1>
         <p class="gate-lede">图片创作平台，用校内邮箱接收验证码后进入。</p>
 
         <div class="gate-field">
