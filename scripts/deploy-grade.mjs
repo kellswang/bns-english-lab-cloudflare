@@ -120,10 +120,17 @@ if (!existsSync(join(root, "node_modules", ".bin", process.platform === "win32" 
   spawn("npm", ["ci"], { label: "npm ci" });
 }
 console.log("[2/6] 检查 Wrangler Cloudflare 认证");
-spawn("npx", ["wrangler", "whoami", ...(accountId ? ["--account", accountId] : [])], { cwd: workerDir, label: "wrangler whoami" });
+spawn("npx", ["wrangler", "whoami"], { cwd: workerDir, label: "wrangler whoami" });
 console.log("[3/6] 创建本年级资源并迁移 D1");
 spawn(process.execPath, [join(root, "scripts/new-grade.mjs"), "--apply"], { label: "new-grade --apply" });
 if (!existsSync(workerConfig)) abort("初始化脚本未生成 Wrangler 配置，停止");
+// 自定义域名只有在账户已托管对应 zone、且部署 Token 有 Zone 权限时才启用。
+if (cfg.custom_domain) {
+  const fsText = readFileSync(workerConfig, "utf8");
+  if (!fsText.includes('"observability"')) abort("Wrangler 模板结构不符合预期，无法安全插入 custom_domain");
+  const routes = '"routes": [{ "pattern": ' + JSON.stringify(cfg.custom_domain.toLowerCase()) + ', "custom_domain": true }],\\n  ';
+  writeFileSync(workerConfig, fsText.replace('"observability"', routes.replace('\\n','\n') + '"observability"'));
+}
 console.log("[4/6] 写入 Worker Secrets");
 let localKeys;
 if (existsSync(localKeysPath)) {
