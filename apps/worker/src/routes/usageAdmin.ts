@@ -116,8 +116,64 @@ adminRoutes.get("/admin/overview", async (c) => {
   });
 });
 
-adminRoutes.get("/admin/logs", async (c) => {
+/**
+ * P2.6:站内估算的存储与用量统计(管理员只读)。
+ * 数字标注"站内估算";平台侧真实额度以 Cloudflare Dashboard / Analytics 为准
+ * (scripts/usage-report.mjs 用 Analytics GraphQL API 拉取)。
+ */
+adminRoutes.get("/admin/storage", async (c) => {
   const ctx = await getOptionalUser(c);
+  requireAdmin(ctx);
+  const v = await one<{ n: number; bytes: number }>(
+    c.env.DB, "SELECT COUNT(*) AS n, COALESCE(SUM(size_bytes), 0) AS bytes FROM versions");
+  const u = await one<{ n: number; bytes: number }>(
+    c.env.DB, "SELECT COUNT(*) AS n, COALESCE(SUM(size_bytes), 0) AS bytes FROM uploads");
+  const a = await one<{ n: number; bytes: number }>(
+    c.env.DB, "SELECT COUNT(*) AS n, COALESCE(SUM(size_bytes), 0) AS bytes FROM chat_attachments");
+  const totalBytes = Number(v?.bytes ?? 0) + Number(u?.bytes ?? 0) + Number(a?.bytes ?? 0);
+  const GB = 1024 * 1024 * 1024;
+  return json({
+    estimated_storage_bytes: totalBytes,
+    estimated_storage_gb: Math.round((totalBytes / GB) * 100) / 100,
+    free_tier_gb: 10,
+    thresholds: { warn_70pct_gb: 7, warn_85pct_gb: 8.5, warn_95pct_gb: 9.5 },
+    breakdown: {
+      versions: { count: v?.n ?? 0, bytes: Number(v?.bytes ?? 0) },
+      uploads: { count: u?.n ?? 0, bytes: Number(u?.bytes ?? 0) },
+      chat_attachments: { count: a?.n ?? 0, bytes: Number(a?.bytes ?? 0) },
+    },
+    note: "站内估算(按对象字节累计);R2 计费按月均 GB-month,以 Cloudflare Dashboard 为准",
+  });
+});
+
+adminRoutes.get("/admin/usage-daily", async (c) => {
+  const ctx = await getOptionalUser(c);
+  requireAdmin(ctx);
+  const days = Math.min(30, Math.max(1, Number(c.req.query("days") || 7)));
+  const since = new Date(Date.now() - days * 86400_000).toISOString();
+  // 北京时间自然日分组:created_at 为 UTC,先 +8h 再取日期
+  const images = await all<{ day: string; n: number; failed: number }>(
+    c.env.DB,
+    "SELECT substr(datetime(created_at, '+8 hours'), 1, 10) AS day, COUNT(*) AS n, " +
+    "SUM(CASE WHEN status IN ('failed','uncertain','interrupted') THEN 1 ELSE 0 END) AS failed " +
+    "FROM generation_jobs WHERE created_at >= ? GROUP BY day ORDER BY day",
+    since,
+  );
+  const chats = await all<{ day: string; n: number }>(
+    c.env.DB,
+    "SELECT substr(datetime(created_at, '+8 hours'), 1, 10) AS day, COUNT(*) AS n " +
+    "FROM chat_messages WHERE role = 'assistant' AND created_at >= ? GROUP BY day ORDER BY day",
+    since,
+  );
+  return json({
+    days,
+    images_per_day: images.map((r) => ({ day: r.day, count: Number(r.n), failed: Number(r.failed) })),
+    chat_answers_per_day: chats.map((r) => ({ day: r.day, count: Number(r.n) })),
+    note: "站内估算(北京时间自然日);Worker 请求/CPU、D1 行读写等平台指标见 usage-report 脚本或 Dashboard",
+  });
+});
+
+adminRoutes.get("/admin/logs", async (c) => {  const ctx = await getOptionalUser(c);
   requireAdmin(ctx);
   const limit = Math.min(500, Math.max(1, Number(c.req.query("limit") || 100)));
   const offset = Math.max(0, Number(c.req.query("offset") || 0));
