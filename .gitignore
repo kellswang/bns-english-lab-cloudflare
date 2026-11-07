@@ -32,3 +32,8 @@ npm-debug.log*
 .vscode/
 .idea/
 .DS_Store
+
+# 部署状态文件(含 secrets 指纹与资源清单)
+deploy-state-*.json
+state-test-*.json
+scripts/deploy/tmp-*.json
