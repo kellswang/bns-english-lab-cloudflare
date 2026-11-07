@@ -240,7 +240,11 @@ generationRoutes.post("/generate", async (c) => {
   await audit(ctx, "generate", { entityId: jobId, detail: `model=${body.model} mode=${mode} source=${source?.id ?? "-"}` });
 
   // D1 已提交;入队失败由巡检 Cron 补偿(sweep 重投 queued 任务)
-  await c.env.GEN.send({ job_id: jobId });
+  try {
+    await c.env.GEN.send({ job_id: jobId });
+  } catch (e) {
+    console.warn("generate enqueue deferred to sweep", jobId, e);
+  }
 
   return json({ job_id: jobId, message_id: messageId, status: "queued", version_id: null, deduplicated: false }, 202);
 });

@@ -19,6 +19,10 @@ export const R2Keys = {
   attachment: (conversationId: string, attachmentId: string) =>
     `attachments/${conversationId}/${attachmentId}`,
   extractedText: (attachmentId: string) => `extracted/${attachmentId}.txt`,
+  /** 大图流水线临时对象(capture/b64 分块/解码分块),任务完成后删除 */
+  rawCapture: (jobId: string) => `tmp/raw/${jobId}`,
+  b64Chunks: (jobId: string) => `tmp/b64/${jobId}`,
+  decChunks: (jobId: string) => `tmp/dec/${jobId}`,
 };
 
 export async function putObject(
@@ -44,6 +48,38 @@ export async function putObject(
 
 export async function getObject(env: Env, key: string): Promise<R2ObjectBody | null> {
   return env.MEDIA.get(key);
+}
+
+// ---------------- R2 Multipart(大图分块上传,跨队列调用续传) ----------------
+
+export async function startMultipart(env: Env, key: string, contentType: string): Promise<R2MultipartUpload> {
+  return env.MEDIA.createMultipartUpload(key, { httpMetadata: { contentType } });
+}
+
+export async function uploadPartFromBytes(
+  upload: R2MultipartUpload,
+  partNumber: number,
+  data: ArrayBuffer | Uint8Array,
+): Promise<{ partNumber: number; etag: string }> {
+  const value = data instanceof Uint8Array
+    ? data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+    : data;
+  const part = await upload.uploadPart(partNumber, value);
+  return { partNumber, etag: part.etag };
+}
+
+export async function abortMultipart(env: Env, key: string, uploadId: string): Promise<void> {
+  // R2 resume multipart 需要按 key + uploadId 恢复
+  const upload = env.MEDIA.resumeMultipartUpload(key, uploadId);
+  await upload.abort();
+}
+
+export async function completeMultipart(
+  upload: R2MultipartUpload,
+  parts: Array<{ partNumber: number; etag: string }>,
+): Promise<R2Object> {
+  parts.sort((a, b) => a.partNumber - b.partNumber);
+  return upload.complete(parts.map((p) => ({ partNumber: p.partNumber, etag: p.etag })));
 }
 
 /** 校验文件魔数,防止把 HTML/脚本伪装成图片写进 R2。 */

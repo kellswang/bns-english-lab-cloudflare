@@ -2,13 +2,15 @@
  * 图片生成集成测试 —— 对应 test_hardening.py 的幂等/容量/状态机核心断言:
  * 同幂等键去重、同键不同参数 409、每日限额、队列消费产出版本、重复投递不重复。
  */
-import { describe, it, expect, beforeAll, afterAll, vi, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { makeTestCtx, type TestCtx } from "./env";
 import { call, login, seedInvite } from "../helpers";
 import { handleQueueBatch } from "../../src/queues/imageConsumer";
+import { startMockUpstream, type MockUpstream } from "../mockUpstream";
 
 let ctx: TestCtx;
 let cookie: string;
+let upstream: MockUpstream;
 const EMAIL = "gen-teacher@example.edu";
 
 // 最小合法 PNG 头 + 填充(消费端只做魔数校验与存储,不解码)
@@ -29,14 +31,31 @@ function queueBatch(jobIds: string[]): any {
   };
 }
 
+const TERMINAL = new Set(["succeeded", "failed", "uncertain", "interrupted", "pending_save"]);
+
+/** 多阶段流水线:反复泵送直到终态。 */
+async function pumpUntilTerminal(jobId: string, max = 200): Promise<string> {
+  for (let i = 0; i < max; i++) {
+    await handleQueueBatch(queueBatch([jobId]), ctx.env);
+    const row = await ctx.env.DB.prepare("SELECT status FROM generation_jobs WHERE id = ?").bind(jobId).first<{ status: string }>();
+    if (row && TERMINAL.has(row.status)) return row.status;
+  }
+  throw new Error("泵送超时,任务未收敛");
+}
+
 beforeAll(async () => {
   ctx = await makeTestCtx();
+  upstream = await startMockUpstream();
+  ctx.env.AI_BASE_URL = upstream.url + "/v1";
   await seedInvite(ctx.env, EMAIL, "生成教师");
   cookie = await login(ctx.env, EMAIL);
 });
 
-afterAll(async () => { await ctx.dispose(); });
-afterEach(() => vi.unstubAllGlobals());
+afterAll(async () => {
+  await upstream.close();
+  await ctx.dispose();
+});
+afterEach(() => upstream.reset());
 
 async function newProject(): Promise<string> {
   const res = await call(ctx.env, "/api/v1/projects", { body: { title: "幂等测试项目" }, cookie });
@@ -113,18 +132,15 @@ describe("队列消费状态机", () => {
     const { job_id: jobId } = await gen.json<{ job_id: string }>();
 
     // mock 上游:返回 2048x1152 PNG(b64)
-    const upstreamBody = {
+    upstream.setNextImageResponse({
       data: [{ b64_json: Buffer.from(fakePng()).toString("base64"), revised_prompt: "一棵大树" }],
       size: "2048x1152",
       usage: { input_tokens: 3, output_tokens: 1 },
       output_format: "png",
-    };
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(upstreamBody), {
-      status: 200,
-      headers: { "content-type": "application/json", "x-request-id": "up-req-1" },
-    })));
+    });
 
-    await handleQueueBatch(queueBatch([jobId]), ctx.env);
+    await pumpUntilTerminal(jobId);
+    expect(upstream.calls.images).toBe(1); // 上游只被调用一次
 
     const jobRow = await ctx.env.DB.prepare("SELECT status, version_id, error FROM generation_jobs WHERE id = ?")
       .bind(jobId).first<{ status: string; version_id: string; error: string | null }>();
@@ -138,7 +154,7 @@ describe("队列消费状态机", () => {
     expect(ver.mode).toBe("generate");
     const params = JSON.parse(ver.params);
     expect(params.size_preset).toBe("16:9");
-    expect(params.upstream_request_id).toBe("up-req-1");
+    expect(params.upstream_request_id).toBe("mock-rid");
     expect(params.native_2k).toBe(true);
 
     // R2 对象存在且可读
@@ -147,8 +163,9 @@ describe("队列消费状态机", () => {
     const buf = await obj!.arrayBuffer();
     expect(buf.byteLength).toBe(2048);
 
-    // 重复投递:再处理一次,不会产生第二个版本
+    // 重复投递:再处理一次,不会产生第二个版本,也不再次调用上游
     await handleQueueBatch(queueBatch([jobId]), ctx.env);
+    expect(upstream.calls.images).toBe(1);
     const cnt = await ctx.env.DB.prepare("SELECT COUNT(*) AS n FROM versions WHERE project_id = ?").bind(pid).first<{ n: number }>();
     expect(Number(cnt?.n)).toBe(1);
 
@@ -173,10 +190,9 @@ describe("队列消费状态机", () => {
     const { job_id: jobId } = await gen.json<{ job_id: string }>();
     expect(jobId).toBeTruthy();
 
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: { message: "server exploded" } }), { status: 500 }));
-    vi.stubGlobal("fetch", fetchMock);
+    upstream.setNextImageResponse(() => ({ status: 500, body: { error: { message: "server exploded" } } }));
     await handleQueueBatch(queueBatch([jobId]), ctx.env);
-    expect(fetchMock).toHaveBeenCalledTimes(1); // 只调一次上游
+    expect(upstream.calls.images).toBe(1); // 只调一次上游
 
     const jobRow = await ctx.env.DB.prepare("SELECT status FROM generation_jobs WHERE id = ?").bind(jobId).first<{ status: string }>();
     expect(jobRow?.status).toBe("uncertain");

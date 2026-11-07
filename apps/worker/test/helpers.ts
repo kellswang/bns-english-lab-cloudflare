@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 测试环境:wrangler getPlatformProxy 提供真实的本地 D1(workerd SQLite)与 R2。
  * 不需要 Cloudflare 账户;线上行为以授权后的真实部署验证为准。
  */
@@ -11,6 +11,40 @@ import type { Env } from "../src/types";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Node 侧 FixedLengthStream polyfill(workerd 原生 API):
+ * 透传字节流并在长度不匹配时报错,行为与 Workers 运行时一致,
+ * 使流水线代码在 vitest / tsx(纯 Node)下可运行。
+ */
+export function installFixedLengthStreamPolyfill(): void {
+  const g = globalThis as unknown as Record<string, unknown>;
+  if (g.FixedLengthStream) return;
+  g.FixedLengthStream = class {
+    readable: ReadableStream<Uint8Array>;
+    writable: WritableStream<Uint8Array>;
+    constructor(expected: number) {
+      let written = 0;
+      const t = new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, ctrl) {
+          written += chunk.byteLength;
+          if (written > expected) {
+            ctrl.error(new Error(`FixedLengthStream: too many bytes (${written} > ${expected})`));
+            return;
+          }
+          ctrl.enqueue(chunk);
+        },
+        flush() {
+          if (written !== expected) {
+            throw new Error(`FixedLengthStream: length mismatch (${written} != ${expected})`);
+          }
+        },
+      });
+      this.readable = t.readable;
+      this.writable = t.writable;
+    }
+  };
+}
+
 export async function makeTestEnv() {
   const proxy = await getPlatformProxy<Record<string, unknown>>({
     configPath: "./wrangler.test.jsonc",
@@ -22,6 +56,11 @@ export async function makeTestEnv() {
   env.RESEND_API_KEY = "";
   env.AI_API_KEY = "test-ai-key";
   env.CHAT_API_KEY = "test-chat-key";
+  // 测试不使用真实队列投递(miniflare 无 consumer 时投递会失败):
+  // 队列消息由测试手动泵送到同一处理函数 handleQueueBatch,与生产行为一致。
+  (env as unknown as Record<string, unknown>).GEN = {
+    send: async () => {},
+  };
 
   // 应用迁移(按文件名顺序);先剥掉注释行再按分号拆分;幂等(表已存在则跳过)
   const migDir = join(here, "../../../db/migrations");

@@ -23,7 +23,21 @@ export async function sweepQueued(env: Env): Promise<number> {
       console.error("sweep requeue failed", row.id, e);
     }
   }
-  return rows.length;
+  // decode 阶段的 running 任务:若队列消息丢失,按分片进度重驱动
+  const decodeCutoff = new Date(Date.now() - 60_000).toISOString();
+  const decoding = await all<{ id: string }>(
+    env.DB,
+    "SELECT id FROM generation_jobs WHERE status = 'running' AND params LIKE '%\"phase\":\"decode\"%' AND started_at <= ? LIMIT 20",
+    decodeCutoff,
+  );
+  for (const row of decoding) {
+    try {
+      await env.GEN.send({ job_id: row.id });
+    } catch (e) {
+      console.error("sweep decode redrive failed", row.id, e);
+    }
+  }
+  return rows.length + decoding.length;
 }
 
 export async function recoverStuckJobs(env: Env): Promise<number> {
