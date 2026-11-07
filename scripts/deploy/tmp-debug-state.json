@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "grade": "g9",
+  "createdAt": "2026-11-07T09:13:37.285Z",
+  "currentStage": "preflight",
+  "stages": {
+    "preflight": {
+      "status": "failed",
+      "startedAt": "2026-11-07T09:13:37.287Z",
+      "finishedAt": "2026-11-07T09:14:16.837Z",
+      "error": {
+        "kind": "config",
+        "message": "教师名单 CSV 文件不存在",
+        "retryable": false
+      },
+      "retryable": true,
+      "result": null
+    }
+  },
+  "resources": {},
+  "secrets": {},
+  "configFingerprint": "grade_id=g9|email_domain=example.edu|school_name=S"
+}

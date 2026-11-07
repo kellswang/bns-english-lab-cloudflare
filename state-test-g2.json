@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "grade": "g2",
+  "createdAt": "2026-11-07T09:11:27.165Z",
+  "currentStage": "completed",
+  "stages": {
+    "preflight": {
+      "status": "done",
+      "startedAt": "2026-11-07T09:11:27.165Z",
+      "finishedAt": "2026-11-07T09:11:27.166Z",
+      "error": null,
+      "retryable": true,
+      "result": null
+    },
+    "account_check": {
+      "status": "done",
+      "startedAt": "2026-11-07T09:11:27.166Z",
+      "finishedAt": "2026-11-07T09:11:27.166Z",
+      "error": null,
+      "retryable": true,
+      "result": null
+    },
+    "resources": {
+      "status": "done",
+      "startedAt": "2026-11-07T09:11:27.166Z",
+      "finishedAt": "2026-11-07T09:11:27.176Z",
+      "error": null,
+      "retryable": true,
+      "result": null
+    },
+    "migrations": {
+      "status": "done",
+      "startedAt": "2026-11-07T09:11:27.176Z",
+      "finishedAt": "2026-11-07T09:11:27.184Z",
+      "error": null,
+      "retryable": true,
+      "result": null
+    },
+    "secrets": {
+      "status": "done",
+      "startedAt": "2026-11-07T09:11:27.192Z",
+      "finishedAt": "2026-11-07T09:11:27.201Z",
+      "error": null,
+      "retryable": true,
+      "result": null
+    },
+    "teachers": {
+      "status": "done",
+      "startedAt": "2026-11-07T09:11:27.201Z",
+      "finishedAt": "2026-11-07T09:11:27.210Z",
+      "error": null,
+      "retryable": true,
+      "result": null
+    },
+    "build": {
+      "status": "done",
+      "startedAt": "2026-11-07T09:11:27.218Z",
+      "finishedAt": "2026-11-07T09:11:27.218Z",
+      "error": null,
+      "retryable": true,
+      "result": null
+    },
+    "deploy": {
+      "status": "done",
+      "startedAt": "2026-11-07T09:11:27.227Z",
+      "finishedAt": "2026-11-07T09:11:27.235Z",
+      "error": null,
+      "retryable": true,
+      "result": null
+    },
+    "healthcheck": {
+      "status": "done",
+      "startedAt": "2026-11-07T09:11:27.235Z",
+      "finishedAt": "2026-11-07T09:11:27.242Z",
+      "error": null,
+      "retryable": true,
+      "result": null
+    },
+    "completed": {
+      "status": "done",
+      "startedAt": "2026-11-07T09:11:27.243Z",
+      "finishedAt": "2026-11-07T09:11:27.251Z",
+      "error": null,
+      "retryable": true,
+      "result": null
+    }
+  },
+  "resources": {
+    "account": {
+      "id": "acct-mock-0001",
+      "name": "Mock Account"
+    },
+    "d1": {
+      "name": "bns-elab-g2-db",
+      "id": "47df444c-1f11-4cbf-b3e0-6403cbf742bd",
+      "createdByTool": true
+    },
+    "r2": {
+      "name": "bns-elab-g2-media",
+      "createdByTool": true
+    },
+    "queues": {
+      "bns-elab-g2-imggen": {
+        "createdByTool": true
+      },
+      "bns-elab-g2-imggen-dlq": {
+        "createdByTool": true
+      }
+    },
+    "worker": {
+      "name": "bns-elab-g2",
+      "url": "https://bns-elab-mock.mock.workers.dev"
+    }
+  },
+  "secrets": {
+    "sessionSecret": "8f10173c4f1602f5d858e4197d49b4dc59688a166b006706b5f292b5ca79bc13",
+    "otpSecret": "b08017b8aa9ee3c315b319920629b991cbc266493660415633bd58e68c9b9d40"
+  },
+  "configFingerprint": "grade_id=g2|email_domain=example.edu|school_name=测试学校"
+}
