@@ -8,8 +8,8 @@ const gitExe = existsSync("D:/Z bns/_tools/MinGit/cmd/git.exe")
   : "git";
 
 const PATTERNS = [
-  { name: "学校域名 bns.cn", re: /bns\.cn/gi },
-  { name: "学校站点 bnslearn.top", re: /bnslearn\.top/gi },
+  { name: "学校域名 YOUR_SCHOOL_DOMAIN.example", re: /bns\.cn/gi },
+  { name: "学校站点 your-site.example", re: /bnslearn\.top/gi },
   { name: "OpenAI 风格密钥", re: /sk-[A-Za-z0-9]{20,}/g },
   { name: "Resend 密钥", re: /re_[A-Za-z0-9]{20,}/g },
   { name: "GitHub Token", re: /gh[pousr]_[A-Za-z0-9]{30,}/g },
