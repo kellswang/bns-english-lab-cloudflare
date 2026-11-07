@@ -29,8 +29,12 @@ for (const f of [
   else console.log("  ✓ " + f);
 }
 
-console.log("== 2. 泄漏扫描(真实姓名/邮箱模式/密钥特征)==");
-// 扫描所有文本文件:任何**非占位**的 @bns.cn 邮箱、长 API key 形态字符串
+console.log("== 2. 泄漏扫描(学校域邮箱[配置驱动]/密钥特征)==");
+// 学校真实域名只从本地 config/grade.json 读取(不入库)—— 公开仓库本身不含真实域名
+const gradeCfgPath = join(root, "config", "grade.json");
+const schoolDomain = existsSync(gradeCfgPath)
+  ? String((JSON.parse(readFileSync(gradeCfgPath, "utf-8")).email_domain || "")).toLowerCase()
+  : "";
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
@@ -48,17 +52,18 @@ for (const file of walk(root)) {
   const text = readFileSync(file, "utf-8");
   const lines = text.split(/\r?\n/);
   lines.forEach((line, i) => {
-    // @bns.cn 是原学校真实域名:新项目中除文档说明"不要复制"的上下文外,一律视为泄漏
-    if (/@bns\.cn/i.test(line) && !/不|never|do not|示例|占位|template|example/i.test(line)) {
+    // 配置了学校域名的实例:任何非占位上下文的校邮箱都视为泄漏
+    if (schoolDomain && line.toLowerCase().includes("@" + schoolDomain) &&
+        !/不|never|do not|示例|占位|template|example/i.test(line)) {
       hit(`${file}:${i + 1} 疑似真实学校邮箱: ${line.trim().slice(0, 100)}`);
     }
-    // 常见密钥形态(sk- 开头 / 长十六进制 40+ 且非测试用途声明)
+    // 常见密钥形态(sk- 开头 / Resend 形态)
     if (/(sk-[A-Za-z0-9]{20,}|re_[A-Za-z0-9]{20,})/.test(line)) {
       hit(`${file}:${i + 1} 疑似真实 API 密钥`);
     }
   });
 }
-console.log(`  扫描 ${scanned} 个文件`);
+console.log(`  扫描 ${scanned} 个文件(学校域名: ${schoolDomain ? "已配置" : "未配置"})`);
 
 console.log("== 3. 密钥文件不得存在 ==");
 for (const f of [".dev.vars", "apps/worker/.dev.vars", "apps/worker/wrangler.jsonc", "config/grade.json"]) {

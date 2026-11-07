@@ -26,6 +26,8 @@ export interface GradeConfig {
 }
 
 export function loadConfig(env: Env): GradeConfig {
+  // P6: Demo 模式安全阀 —— 生产环境或配置了真实上游/邮件密钥时强制关闭
+  const demoMode = env.DEMO_MODE === "1" && env.APP_ENV !== "production" && !env.RESEND_API_KEY && !env.AI_API_KEY;
   const adminEmails = new Set(
     (env.ADMIN_EMAILS || "")
       .split(",")
@@ -38,13 +40,14 @@ export function loadConfig(env: Env): GradeConfig {
       .map((s) => s.trim())
       .filter(Boolean),
   );
-  return {
+  // demoMode 传递给 auth 路由(演示验证码)与 chat/image 路由(mock 上游)
+  const config: GradeConfig = {
     env: env.APP_ENV || "production",
     gradeId: env.GRADE_ID || "grade",
     gradeLabel: env.GRADE_LABEL || "英语教研",
     schoolName: env.SCHOOL_NAME || "",
     emailDomain: (env.EMAIL_DOMAIN || "").toLowerCase(),
-    emailDevShowCode: env.APP_ENV === "development",
+    emailDevShowCode: env.APP_ENV === "development" || demoMode,
     // Cookie 名含年级 id,保证同负责人多实例浏览器并行登录时不互相覆盖
     sessionCookieName: `bns_lab_session_${env.GRADE_ID || "grade"}`,
     sessionDays: 1,
@@ -59,4 +62,6 @@ export function loadConfig(env: Env): GradeConfig {
     adminEmails,
     exemptIps,
   };
+  (config as GradeConfig & { demoMode?: boolean }).demoMode = demoMode;
+  return config;
 }

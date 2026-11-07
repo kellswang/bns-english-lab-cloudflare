@@ -27,6 +27,8 @@ export interface Env {
   IMAGE_DAILY_LIMIT_PER_USER: string;
   ADMIN_EMAILS: string;
   EMAIL_RATE_LIMIT_EXEMPT_IPS: string;
+  /** P6: 演示模式(仅 development 允许)—— 固定演示账号、mock 验证码与 AI,绝不能在生产开启 */
+  DEMO_MODE: string;
 }
 
 export interface GenerationMessage {
