@@ -1,0 +1,29 @@
+{
+  "name": "bns-image-lab-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test:markdown": "esbuild --bundle src/utils/markdown.ts --outfile=.mdtest-lib.mjs --format=esm --loader:.css=empty --platform=browser && node scripts/markdown-regression.mjs",
+    "type-check": "vue-tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "dompurify": "^3.4.17",
+    "katex": "^0.19.1",
+    "marked": "^15.0.12",
+    "pinia": "^2.3.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "jsdom": "^31.0.0",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.5",
+    "vue-tsc": "^2.2.0"
+  }
+}

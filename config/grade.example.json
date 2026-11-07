@@ -1,0 +1,19 @@
+{
+  "name": "bns-elab-grade-config",
+  "comment": "年级实例配置模板。复制为 grade.json 后填入本年级真实值;grade.json 已列入 .gitignore,绝不提交。",
+  "grade_id": "<grade>",
+  "grade_label": "<年级显示名,如:三年级>",
+  "school_name": "<学校显示名>",
+  "email_domain": "<校内邮箱域名,如 school.edu.cn>",
+  "admin_emails": ["<年级负责人邮箱>"],
+  "email_rate_limit_exempt_ips": [],
+  "price_per_image_usd": 0.02,
+  "image_daily_limit_per_user": 60,
+  "image_max_active_per_user": 3,
+  "image_max_active_global": 24,
+  "features": {
+    "image_generation": true,
+    "ai_chat": true,
+    "admin_panel": true
+  }
+}

@@ -1,0 +1,30 @@
+// 测试专用 wrangler 配置:miniflare 本地模拟 D1/R2/Queues,不需要 Cloudflare 账户。
+{
+  "name": "bns-elab-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    { "binding": "DB", "database_name": "test-db", "database_id": "local-test" }
+  ],
+  "r2_buckets": [
+    { "binding": "MEDIA", "bucket_name": "test-media" }
+  ],
+  "queues": {
+    "producers": [{ "binding": "GEN", "queue": "test-imggen" }]
+  },
+  "vars": {
+    "APP_ENV": "development",
+    "GRADE_ID": "gtest",
+    "GRADE_LABEL": "测试年级",
+    "SCHOOL_NAME": "测试学校",
+    "EMAIL_DOMAIN": "example.edu",
+    "RESEND_FROM_EMAIL": "noreply@example.edu",
+    "AI_BASE_URL": "https://ai-mock.test/v1",
+    "CHAT_BASE_URL": "https://ai-mock.test/v1",
+    "PRICE_PER_IMAGE_USD": "0.02",
+    "IMAGE_DAILY_LIMIT_PER_USER": "3",
+    "ADMIN_EMAILS": "admin@example.edu",
+    "EMAIL_RATE_LIMIT_EXEMPT_IPS": ""
+  }
+}

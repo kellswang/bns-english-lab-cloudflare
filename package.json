@@ -1,0 +1,20 @@
+{
+  "name": "bns-english-lab-cloudflare",
+  "private": true,
+  "version": "0.1.0",
+  "description": "BNS 英语教研平台 — Cloudflare 原生单租户部署(每年级独立实例)",
+  "type": "module",
+  "workspaces": [
+    "apps/worker",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w apps/web",
+    "dev:worker": "npm run dev -w apps/worker",
+    "build:web": "npm run build -w apps/web",
+    "build:worker": "npm run check -w apps/worker",
+    "typecheck": "npm run check -w apps/worker && npm run type-check -w apps/web",
+    "test": "npm run test -w apps/worker",
+    "deploy": "npm run deploy -w apps/worker"
+  }
+}

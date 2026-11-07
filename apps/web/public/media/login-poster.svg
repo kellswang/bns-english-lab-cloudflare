@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
+  <!-- 兜底封面：配色与视频首帧 (#efe7d0) 一致，任何加载路径都不跳色 -->
+  <rect width="1000" height="1000" fill="#efe7d0"/>
+  <g stroke="#cbc6b4" stroke-width="1" fill="none">
+    <path d="M0 500h1000M500 0v1000" opacity=".35"/>
+    <path d="M80 80h52M80 80v52M920 80h-52M920 80v52M80 920h52M80 920v-52M920 920h-52M920 920v-52" stroke="#8b8474" stroke-width="1.4"/>
+    <rect x="170" y="170" width="660" height="660"/>
+  </g>
+
+  <!-- 六格任务单 / 漫画的抽象骨架 -->
+  <g fill="none" stroke="#cbc6b4" stroke-width="1.2">
+    <rect x="230" y="230" width="160" height="160"/>
+    <rect x="420" y="230" width="160" height="160"/>
+    <rect x="610" y="230" width="160" height="160"/>
+    <rect x="230" y="420" width="160" height="160"/>
+    <rect x="420" y="420" width="160" height="160"/>
+    <rect x="610" y="420" width="160" height="160"/>
+  </g>
+  <g stroke="#6b6558" stroke-width="1.1" opacity=".65" fill="none">
+    <circle cx="310" cy="310" r="26"/>
+    <path d="M270 366l40-44 26 24 34-40 24 60"/>
+    <path d="M480 310h40m-20-20v40"/>
+    <path d="M690 270v80m-40-40h80"/>
+    <rect x="262" y="452" width="96" height="96" rx="48"/>
+    <path d="M462 500h76m-38-38v76"/>
+    <path d="M652 540l38-80 38 80z"/>
+  </g>
+  <!-- 正在生成的那一格 -->
+  <rect x="420" y="420" width="160" height="160" fill="#e8e4d4" stroke="#b7604d" stroke-width="1.6"/>
+  <path d="M420 420l160 160M580 420l-160 160" stroke="#cbc6b4" stroke-width="1"/>
+  <circle cx="500" cy="500" r="9" fill="none" stroke="#b7604d" stroke-width="1.4"/>
+  <path d="M500 482v-10M500 518v10M482 500h-10M518 500h10" stroke="#b7604d" stroke-width="1.2"/>
+
+  <!-- 底部：prompt → image 的进度线 -->
+  <g stroke="#cbc6b4" stroke-width="1"><path d="M230 650h540"/></g>
+  <path d="M230 650h210" stroke="#b7604d" stroke-width="2"/>
+  <circle cx="440" cy="650" r="4" fill="#b7604d"/>
+  <g fill="#6b6558" font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="15" letter-spacing="3">
+    <text x="230" y="690">PROMPT</text>
+    <text x="690" y="690" text-anchor="end">IMAGE</text>
+  </g>
+  <g fill="#2a2a25" font-family="sans-serif" font-size="17" letter-spacing="2">
+    <text x="230" y="760">BNS四年级英语教研平台</text>
+  </g>
+  <g fill="#6b6558" font-family="sans-serif" font-size="13" letter-spacing="2">
+    <text x="230" y="790">图片创作平台</text>
+  </g>
+</svg>

@@ -1,0 +1,21 @@
+# 仅本地开发用(.dev.vars 是真实文件,已被 .gitignore 排除;此处全部为占位/mock 值)
+APP_ENV = development
+GRADE_ID = "g-local"
+GRADE_LABEL = "本地演练"
+SCHOOL_NAME = "演示学校"
+EMAIL_DOMAIN = "example.edu"
+RESEND_FROM_EMAIL = "noreply@example.edu"
+
+# 本地演练密钥(占位;真实部署用 wrangler secret put)
+SESSION_SECRET = "dev-secret-0123456789abcdef0123456789abcdef"
+OTP_SECRET = "dev-otp-secret-0123456789abcdef0123456789abcdef"
+RESEND_API_KEY = ""
+AI_API_KEY = ""
+CHAT_API_KEY = ""
+
+AI_BASE_URL = "https://ai-mock.local/v1"
+CHAT_BASE_URL = "https://ai-mock.local/v1"
+PRICE_PER_IMAGE_USD = "0.02"
+IMAGE_DAILY_LIMIT_PER_USER = "60"
+ADMIN_EMAILS = "admin@example.edu"
+EMAIL_RATE_LIMIT_EXEMPT_IPS = ""

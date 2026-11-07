@@ -1,0 +1,74 @@
+// wrangler 配置模板 —— 每个年级实例复制为 wrangler.jsonc 后填入自己账户的真实值。
+// 绝不把 account_id、D1 database_id、真实密钥提交进仓库。
+// 资源命名约定:bns-elab-<grade>-*(例:bns-elab-g4-db),保证多实例互不混淆。
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bns-elab-<grade>",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  // nodejs_compat 仅为少数 npm 库的兼容层预留;业务代码只用 Web 标准 API
+  "compatibility_flags": ["nodejs_compat"],
+
+  // ---- 静态资源:Vue 构建产物;只有 /api/* 才进 Worker,静态请求不计费 ----
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+
+  // ---- 资源绑定(部署时先 create 再把真实 ID 填在这里) ----
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bns-elab-<grade>-db",
+      "database_id": "<在下方「创建资源」步骤后填入>"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "bns-elab-<grade>-media"
+    }
+  ],
+  "queues": {
+    "producers": [{ "binding": "GEN", "queue": "bns-elab-<grade>-imggen" }],
+    "consumers": [
+      {
+        "queue": "bns-elab-<grade>-imggen",
+        "max_batch_size": 1,
+        "max_batch_timeout": 0,
+        "max_retries": 2,
+        "dead_letter_queue": "bns-elab-<grade>-imggen-dlq",
+        "max_consumer_concurrency": 1
+      }
+    ]
+  },
+
+  // ---- Cron:免费版每账户共 5 个;本实例用 3 个 ----
+  "triggers": {
+    "crons": [
+      "*/15 * * * *", // 费用核对(pending -> verified/unavailable)
+      "*/5 * * * *", // 图片任务巡检(queued 超时重投递 / 挂起任务收敛)
+      "30 20 * * *" // 每日北京时间 04:30 清理过期验证码与限流计数
+    ]
+  },
+
+  // ---- 非敏感变量(每年级不同;真实密钥用 wrangler secret put 配置) ----
+  "vars": {
+    "APP_ENV": "production",
+    "GRADE_ID": "<grade>",
+    "GRADE_LABEL": "<年级显示名,如:四年级>",
+    "SCHOOL_NAME": "<学校显示名>",
+    "EMAIL_DOMAIN": "<校内邮箱域名>",
+    "RESEND_FROM_EMAIL": "<发件地址,需在 Resend 完成域名验证>",
+    "AI_BASE_URL": "<图像 API 网关根地址>",
+    "CHAT_BASE_URL": "<对话 API 网关根地址>",
+    "PRICE_PER_IMAGE_USD": "0.02",
+    "IMAGE_DAILY_LIMIT_PER_USER": "60",
+    "ADMIN_EMAILS": "<年级负责人邮箱,逗号分隔>",
+    "EMAIL_RATE_LIMIT_EXEMPT_IPS": "<可选:学校出口 IP,逗号分隔>"
+  },
+
+  "observability": { "enabled": true }
+}
