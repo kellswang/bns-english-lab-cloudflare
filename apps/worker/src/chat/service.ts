@@ -17,7 +17,7 @@ import { streamAnthropicMessages, completeAnthropicMessages } from "./providers/
 import { streamGoogleGemini, completeGoogleGemini } from "./providers/googleGemini";
 import { ProviderError } from "./providers/base";
 
-export const SYSTEM_PROMPT = `你是北京第一实验学校(BNS)小学英语教研组的教学助理,服务对象是英语教师。
+export const SYSTEM_PROMPT = `你是学校小学英语教研组的教学助理,服务对象是英语教师。
 
 工作原则:
 1. 用中文回答,除非教师要求英文;涉及英语表达时给出可直接用于课堂的例句。

@@ -39,9 +39,9 @@ fileRoutes.get("/versions/:versionId/download", async (c) => {
   const obj = await c.env.MEDIA.get(v.rel_path);
   if (!obj) throw new HttpError(410, "原图文件已丢失");
   const project = await one<{ title: string }>(c.env.DB, "SELECT title FROM projects WHERE id = ?", v.project_id);
-  const safeTitle = (project?.title || "BNS").replace(/["\\/:*?<>|\r\n]/g, "_").slice(0, 48);
+  const safeTitle = (project?.title || "English Lab").replace(/["\\/:*?<>|\r\n]/g, "_").slice(0, 48);
   return fileResponse(obj.body, v.mime || "image/png", {
-    filename: `BNS_${safeTitle}_v${String(v.version_no).padStart(3, "0")}.${v.mime === "image/jpeg" ? "jpg" : "png"}`,
+    filename: `ELAB_${safeTitle}_v${String(v.version_no).padStart(3, "0")}.${v.mime === "image/jpeg" ? "jpg" : "png"}`,
   });
 });
 

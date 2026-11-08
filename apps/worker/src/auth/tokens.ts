@@ -1,11 +1,11 @@
 /**
  * 会话令牌与验证码摘要 — 对应原 backend/app/security.py。
  *
- * 原实现:PyJWT HS256(iss=bns-image-lab, sub/role/rmb/jti/iat/exp)。
+ * 原实现:PyJWT HS256(iss=english-lab, sub/role/rmb/jti/iat/exp)。
  * Workers 无 PyJWT,这里用 WebCrypto HMAC-SHA256 实现等价的最小 JWT:
  * 仅支持 HS256 签发/校验,校验 issuer 与 exp,不做其它算法(防算法混淆)。
  */
-const ISSUER = "bns-image-lab";
+const ISSUER = "english-lab";
 const enc = new TextEncoder();
 
 function b64urlEncode(bytes: Uint8Array): string {

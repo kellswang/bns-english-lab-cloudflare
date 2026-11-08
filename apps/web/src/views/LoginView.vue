@@ -77,8 +77,8 @@ function onRememberChange() {
   localStorage.setItem(REMEMBER_KEY, remember.value ? '1' : '0')
 }
 
-const contactEmail = 'kellswang@hotmail.com'
-const mailto = `mailto:${contactEmail}?subject=${encodeURIComponent('关于英语教研平台的咨询')}`
+const contactEmail = ''
+const mailto = contactEmail ? `mailto:${contactEmail}?subject=${encodeURIComponent('关于英语教研平台的咨询')}` : ''
 
 function shake() {
   shaking.value = true
@@ -95,7 +95,7 @@ function cleanLocal(raw: string) {
 /**
  * 中文拼音输入法：组字过程中（composition）绝不能改写 input.value。
  * 之前每个 input 事件都强制回写清洗后的值，会打断 IME 组字，
- * 已上屏的拼音被重新插入 → 出现「wangfeifanwangfeifan」这类重复。
+ * 已上屏的拼音被重新插入 → 出现拼音重复。
  * 现在组字期间完全不干预，等 compositionend 再统一清洗一次。
  */
 let emailComposing = false
@@ -371,7 +371,7 @@ function onSubmit() {
           <code>{{ fullEmail }}</code> 不在英语教研组的邀请名单内。
         </p>
         <p class="modal-note">
-          需要开通请联系 <b>王飞凡</b>（企业微信）<br />
+          需要开通请联系年级负责人（企业微信）<br />
           说明姓名与校内邮箱即可。
         </p>
         <button class="modal-btn" type="button" @click="closeNotInvited">重新输入邮箱</button>
