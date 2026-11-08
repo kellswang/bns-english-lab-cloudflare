@@ -1,88 +1,135 @@
-# BNS AI English Lab — Cloudflare Edition
+<div align="center">
 
-面向学校英语教研组的 AI 备课工作台:AI 对话(三家原生协议)+ 图片创作(15 画幅原生 2K)+ 文档阅读(PDF/DOCX)。
-单代码库,**每个年级一份独立部署**(Worker / D1 / R2 / Queues / 教师白名单 / 密钥全部隔离)。
+# 🏫 BNS AI English Lab — Cloudflare Edition
 
-## 功能
+**学校英语教研组 AI 备课工作台**
 
-- **AI 对话**:OpenAI Responses / Anthropic Messages / Google Gemini 原生协议,4 档思考深度,流式输出,历史分支,PDF/DOCX/图片附件
-- **图片创作**:2 款图像模型,15 种画幅(1:1 / A5–A1 横竖 / 4:3 / 3:4 / 16:9 / 9:16),原生 2K(不缩放),基于原图编辑,版本树分叉
-- **登录**:校内邮箱验证码(白名单制,HMAC 存储,原子限流),30 天"记住设备"
-- **管理**:只读汇总(各教师图片张数/费用核对状态)、操作日志、存储估算与预警
-- **费用**:图片按快照单价估算,对话按上游实际账单 Cron 核对,分账呈现
+AI 对话 · 图片创作 · 文档阅读 · 多年级独立部署 · 免费套餐可用
 
-## 架构
+[![CI](https://github.com/kellswang/bns-english-lab-cloudflare/actions/workflows/ci.yml/badge.svg)](https://github.com/kellswang/bns-english-lab-cloudflare/actions)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6)
+![Vue 3](https://img.shields.io/badge/Vue-3.5-42B883)
+![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020)
+
+</div>
+
+---
+
+## ✨ 功能一览
+
+| 模块 | 说明 |
+|---|---|
+| 🤖 **AI 对话** | OpenAI / Anthropic / Google 三家原生协议，4 档思考深度，流式输出，历史分支，编辑重问 |
+| 🎨 **图片创作** | 2 款图像模型，15 种画幅(1:1 / A5–A1 横竖 / 4:3 / 3:4 / 16:9 / 9:16)，**原生 2K**(不缩放不裁切)，基于原图编辑，版本树分叉 |
+| 📄 **文档阅读** | PDF / DOCX / TXT / CSV / JSON，浏览器端解析(隐私数据不离开设备)，截断如实标注 |
+| 🖼️ **附件** | 图片自动去 EXIF/GPS，对话附件缩到模型输入尺寸，参考图保持原分辨率 |
+| 🔐 **登录** | 校内邮箱验证码(白名单制)，HMAC 存储，原子限流，30 天"记住设备" |
+| 📊 **管理** | 各教师图片张数 / 费用核对 / 操作日志 / 存储估算 / 免费额度预警 |
+| 💰 **费用** | 图片按快照单价，对话按上游账单核对，分账呈现，无隐藏消费 |
+| 🏢 **多年级** | 单代码库，每年级独立 Worker / D1 / R2 / Queues / 密钥，互不干扰 |
+
+## 🏗️ 架构
 
 ```
-浏览器 (Vue 3 + Pinia, Static Assets 直出)
-  └─ /api/* → Cloudflare Worker (TypeScript, Hono)
+浏览器 (Vue 3 + Pinia, Cloudflare Static Assets 直出)
+  └─ /api/* → Cloudflare Worker (TypeScript + Hono)
        ├─ D1        教师白名单 / 用户 / 项目 / 版本树 / 对话 / 审计
        ├─ R2        原图(私有) / 参考图 / 附件(按所有者鉴权)
-       ├─ Queues    图片生成任务(字节级分阶段流水线,原子领取,幂等)
+       ├─ Queues    图片生成(字节级分阶段流水线，原子领取，幂等)
        ├─ Cron      费用核对(15min) / 任务巡检(5min) / 清理(每日)
        ├─ Resend    验证码邮件(每实例独立密钥)
-       └─ AI 网关   TeamoRouter 图像 + 三家对话(每实例独立密钥)
+       └─ AI 网关   图像 + 三家对话(每实例独立密钥)
 ```
 
-## Cloudflare Free 适用条件
+## 🚀 快速体验 Demo
 
-12 位教师、每天约 20 轮对话 + 5~20 张图的规模在免费额度内(请求 <5%、D1 读 <10%)。
-限制与预警详见 `docs/COST_MODEL.md`;**Queues 在 20MB 大图档位是第一约束**(29 ops/张),
-日常建议小档位。图片走"字节级分阶段流水线",单次调用 CPU ≪ 10ms(线上数值待探针实测)。
-
-## 额外成本(非 Cloudflare)
-
-- AI 网关:图片 $0.02/张(站内快照价)+ 对话 token 费 —— 由各年级自己的密钥承担
-- Resend 邮件:免费档每月 3,000 封,验证码用量内通常免费
-
-## 快速体验 Demo
-
-```
-cd apps/web && npm install && npm run build
-cd ../worker
-cp .dev.vars.example .dev.vars   # 编辑:DEMO_MODE = "1"(演示模式)
-npx wrangler dev                 # 打开 http://127.0.0.1:8787
+```bash
+git clone https://github.com/kellswang/bns-english-lab-cloudflare.git
+cd bns-english-lab-cloudflare && npm install
+cd apps/web && npm run build && cd ../worker
+echo 'DEMO_MODE = "1"' >> .dev.vars
+npx wrangler dev
+# 打开 http://127.0.0.1:8787 — 演示模式,无需任何 API Key
 ```
 
-Demo 模式使用固定演示账号与模拟 AI(不出网、不计费),与生产模式严格隔离
-(生产环境误配 DEMO_MODE 会被启动安全阀强制关闭)。
+> Demo 模式使用模拟 AI 与固定验证码，不出网不计费。生产环境误配会自动关闭。
 
-## 从零开始部署(年级负责人)
+## 🛠️ 正式部署（年级负责人）
 
-1. 安装 Node.js 20+
-2. `npm install`
-3. `node scripts/deploy-grade.mjs` → 中文向导(默认预览,确认后才执行)
-4. 完成后按 `docs/DEPLOY_CHECKLIST.md` 验收
+### 你需要准备
 
-详见 `docs/DEPLOY_GRADE.md`。需要准备:TeamoRouter API Key、教师名单 CSV、
-Cloudflare API Token(受限)、Resend API Key。
-
-## 常见问题
-
-| 现象 | 处理 |
+| 项 | 说明 |
 |---|---|
-| 验证码收不到 | 检查 Resend 域名验证与发件地址;名单外邮箱不发信 |
-| R2 报 "not entitled" | 控制台开通 R2(免费,需绑卡) |
-| 部署中途失败 | 直接重跑 `node scripts/deploy-grade.mjs --resume`,已完成阶段自动跳过 |
-| 生成卡住 | 任务会被巡检自动重驱动;绝不重复扣费 |
-| 图片很大 / 队列慢 | 参考文档 COST_MODEL 的档位建议 |
+| Cloudflare 账户 | Free 套餐即可(R2 需绑卡，免费额度内不扣费) |
+| AI API Key | TeamoRouter 或兼容网关(本年级独立计费) |
+| Resend API Key | 验证码邮件(已验证发件域名) |
+| 教师名单 CSV | 格式：`real_name,email` |
+| Node.js 20+ | 本机安装 |
 
-## 升级 / 备份 / 恢复
+### 三步部署
 
-- 升级:`docs/UPGRADE_AND_ROLLBACK.md`(先备份 → git pull → 迁移 → 部署 → 健康检查;失败 `wrangler rollback`)
-- 备份:`node scripts/backup-d1.mjs <年级>` + `node scripts/backup-r2.mjs <年级> --hash`
-- 恢复演练:`npx tsx scripts/restore-drill.mts`(本地模拟,RESTORE_DRILL_OK)
+```bash
+# 1. 安装依赖
+npm install
 
-## 贡献
+# 2. 运行中文安装向导(默认预览，确认后才执行)
+node scripts/deploy-grade.mjs
 
-见 `CONTRIBUTING.md`。安全漏洞请勿公开提交,见 `SECURITY.md`。
+# 3. 按向导输出完成密钥配置 → 构建 → 部署 → 验收
+```
 
-## 状态
+详细步骤与截图见 **[docs/DEPLOY_CHECKLIST.md](docs/DEPLOY_CHECKLIST.md)**。
 
-| 项 | 状态 |
+## 💰 免费额度
+
+12 位教师、每天 20 轮对话 + 5~20 张图的规模在 **Cloudflare Free** 内：
+
+| 资源 | 占用 | 免费上限 |
+|---|---|---|
+| Worker 请求 | ~3% | 100,000/天 |
+| D1 读 | 5-10% | 500 万行/天 |
+| D1 写 | 15-40% | 10 万行/天 |
+| Queues | 2-70%⚠ | 10,000 ops/天 |
+| R2 存储 | 55 使用日到 10GB | 10 GB-month |
+
+⚠ Queues 在 20MB 大图档位是第一约束。详见 [docs/COST_MODEL.md](docs/COST_MODEL.md)。
+
+**额外成本(非 Cloudflare)**：AI 网关 $0.02/图 + 对话 token 费；Resend 免费 3,000 封/月。
+
+## 📖 文档
+
+| 文档 | 内容 |
 |---|---|
-| 本地自动化测试 | ✅ 119 + 23 项通过 |
-| 真浏览器 E2E | ✅ 全链路(见 docs/TEST_REPORT.md) |
-| Cloudflare Free 线上验证 | ⏳ 待真实账户(探针与手册已备好) |
+| [部署检查表](docs/DEPLOY_CHECKLIST.md) | 非技术教师 15 分钟部署验收 |
+| [部署手册](docs/DEPLOY_GRADE.md) | 完整步骤与命令 |
+| [成本模型](docs/COST_MODEL.md) | 免费额度消耗测算与预警 |
+| [备份恢复](docs/BACKUP_AND_RESTORE.md) | D1 + R2 备份、恢复演练 |
+| [升级回滚](docs/UPGRADE_AND_ROLLBACK.md) | 版本升级与失败回滚 |
+| [技术方案](docs/FEASIBILITY.md) | 架构决策与可行性 |
 
-English README: 见 `docs/README_EN.md`(占位,欢迎贡献翻译)。
+## 🧑‍🏫 教师管理
+
+```bash
+node scripts/teachers.mjs list                    # 查看名单
+node scripts/teachers.mjs add 张三 t03@school.edu # 增加教师
+node scripts/teachers.mjs disable t02@school.edu  # 停用(立即生效)
+node scripts/teachers.mjs export                  # 导出名单
+```
+
+所有操作默认 dry-run，加 `--apply` 执行。完整命令见 `node scripts/teachers.mjs`。
+
+## 🤝 贡献
+
+欢迎提交 PR！请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## 🔒 安全
+
+发现安全漏洞请勿公开提交，见 [SECURITY.md](SECURITY.md)。
+
+---
+
+<div align="center">
+
+**Built with** Cloudflare Workers · D1 · R2 · Queues · Vue 3 · Hono · TypeScript
+
+</div>
