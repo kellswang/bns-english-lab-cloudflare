@@ -15,15 +15,34 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, url: string, body?: unknown, form?: FormData): Promise<T> {
+/** 默认 20 秒：登录发码/验证这类短请求卡住时必须能失败退出，
+ *  否则按钮会一直停在「正在验证…」，用户以为死机。上传单独放宽。
+ *  流式对话与图片二进制读取各自独立实现，不走这里。 */
+const DEFAULT_TIMEOUT_MS = 20000
+
+async function request<T>(method: string, url: string, body?: unknown, form?: FormData,
+                          timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<T> {
   const headers: Record<string, string> = { 'X-Requested-With': 'XMLHttpRequest' }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
-  const res = await fetch(url, {
-    method,
-    headers,
-    credentials: 'same-origin',
-    body: form ?? (body !== undefined ? JSON.stringify(body) : undefined),
-  })
+  const controller = new AbortController()
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs)
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method,
+      headers,
+      credentials: 'same-origin',
+      signal: controller.signal,
+      body: form ?? (body !== undefined ? JSON.stringify(body) : undefined),
+    })
+  } catch (e: any) {
+    if (e?.name === 'AbortError') {
+      throw new ApiError(0, '网络响应超时，请检查网络后重试', {})
+    }
+    throw new ApiError(0, '网络连接失败，请检查网络后重试', {})
+  } finally {
+    window.clearTimeout(timer)
+  }
   if (res.status === 204) return undefined as T
   const text = await res.text()
   let data: any = null
@@ -43,5 +62,5 @@ export const api = {
   post: <T>(url: string, body?: unknown) => request<T>('POST', url, body),
   patch: <T>(url: string, body?: unknown) => request<T>('PATCH', url, body),
   del: <T>(url: string) => request<T>('DELETE', url),
-  upload: <T>(url: string, form: FormData) => request<T>('POST', url, undefined, form),
+  upload: <T>(url: string, form: FormData) => request<T>('POST', url, undefined, form, 180000),
 }

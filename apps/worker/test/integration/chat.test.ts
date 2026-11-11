@@ -173,16 +173,23 @@ describe("对话 SSE 全链路", () => {
       .toEqual(["原始问题", "编辑后的问题"]);
   });
 
-  it("不可用模型不静默替换:claude-fable-5-5 → 400", async () => {
+  it("已下线/未知模型不静默替换:直接 400,不透传上游", async () => {
     const conv = await call(ctx.env, "/api/v1/chat/conversations", {
       body: { model: "gpt-6.1-sol", thinking: "standard" }, cookie,
     });
     const convId = (await conv.json<{ id: string }>()).id;
-    const res = await call(ctx.env, `/api/v1/chat/conversations/${convId}/messages`, {
-      body: { content: "试试不可用模型", model: "claude-fable-5-5", thinking: "standard" }, cookie,
+
+    // 已下线型号(曾因上游 model_not_available 保留标记,现直接移除)
+    const gone = await call(ctx.env, `/api/v1/chat/conversations/${convId}/messages`, {
+      body: { content: "试试已下线模型", model: "claude-fable-5-5", thinking: "standard" }, cookie,
     });
-    expect(res.status).toBe(400);
-    const detail = await res.json<{ detail: string }>();
-    expect(detail.detail).toContain("不可用");
+    expect(gone.status).toBe(400);
+    expect((await gone.json<{ detail: string }>()).detail).toContain("不在允许清单");
+
+    // 完全不存在的型号
+    const bogus = await call(ctx.env, `/api/v1/chat/conversations/${convId}/messages`, {
+      body: { content: "试试瞎编的模型", model: "gpt-5.6-sol", thinking: "standard" }, cookie,
+    });
+    expect(bogus.status).toBe(400);
   });
 });

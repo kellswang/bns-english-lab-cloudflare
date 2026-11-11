@@ -124,7 +124,9 @@ function applyEmailValue(el: HTMLInputElement) {
   if (cleaned === localPart.value) return
   localPart.value = cleaned
   emailError.value = ''
-  // 邮箱一改，之前收到的验证码就不再对应它，直接收起验证码区
+  // 邮箱一改，之前收到的验证码就不再对应它，直接收起验证码区。
+  // 必须给出明确原因：否则用户看到验证码框突然消失，会再点一次发送，
+  // 而这时通常还在冷却期内，于是只收到 429，看起来像「点了没反应」。
   if (stage.value === 'code') {
     stage.value = 'email'
     clearCode()
@@ -132,6 +134,8 @@ function applyEmailValue(el: HTMLInputElement) {
     devCode.value = ''
     resendIn.value = 0
     if (resendTimer) { window.clearInterval(resendTimer); resendTimer = undefined }
+    emailError.value = '邮箱已修改，请重新点击「发送验证码」'
+    nextTick(() => emailInput.value?.focus())
   }
 }
 
@@ -188,15 +192,20 @@ async function sendCode() {
   }
   localPart.value = local
   sending.value = true
+  // 乐观展开：立即切到验证码区。发信要 0.4–0.9 秒，若等响应再展开，
+  // 用户会以为没反应而重复点击，第二次必然被冷却挡成 429。
+  stage.value = 'code'
+  codeHint.value = '正在发送验证码…'
+  await nextTick()
   try {
     const res = await auth.requestCode(fullEmail.value)
-    stage.value = 'code'
     codeHint.value = `验证码已发送至 ${res.email}，5 分钟内有效`
     startCountdown(res.resend_after || 60)
     devCode.value = res.dev_code || ''
     await nextTick()
     codeBoxes.value[0]?.focus()
   } catch (e: any) {
+    stage.value = 'email'   // 没发出去就退回邮箱输入，避免用户对着空的验证码框等
     const code = e?.detail?.code
     if (code === 'not_invited' || code === 'invite_disabled' || e?.status === 403) {
       // 非邀请用户：不发码、不建号，只给权限提示弹窗
@@ -308,6 +317,7 @@ function onSubmit() {
                 type="text"
                 inputmode="numeric"
                 maxlength="2"
+                :disabled="sending"
                 :aria-label="`验证码第 ${i} 位`"
                 @input="onBoxInput(i - 1, $event)"
                 @compositionstart="onBoxCompositionStart"
@@ -329,7 +339,7 @@ function onSubmit() {
             {{ verifying ? '正在验证…' : '登录' }}
           </button>
           <button class="gate-resend" type="button" :disabled="resendIn > 0 || sending" @click="sendCode">
-            {{ resendIn > 0 ? `重新发送（${resendIn} 秒）` : '重新发送' }}
+            {{ sending ? '正在发送…' : (resendIn > 0 ? `重新发送（${resendIn} 秒）` : '重新发送') }}
           </button>
         </div>
 

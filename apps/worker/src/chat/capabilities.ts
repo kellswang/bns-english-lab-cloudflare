@@ -1,6 +1,6 @@
 /**
  * 对话模型能力注册表 —— capabilities.py 的完整翻译,全站唯一白名单。
- * 8 款模型(1 款上游不可用,保留标记不静默替换)、4 档思考、各家用原生协议映射。
+ * 9 款模型(全部上游可用)、4 档思考、各家用原生协议映射。
  */
 export const THINKING_LEVELS = ["fast", "standard", "deep", "ultra"] as const;
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
@@ -77,12 +77,10 @@ export const MODELS: ChatModelSpec[] = [
     thinking: { kind: "anthropic_budget", budgets: { fast: 0, standard: 2048, deep: 8192, ultra: 32000 }, adaptive: true },
   },
   {
-    id: "claude-fable-5-5", label: "Claude Fable 5.1", vendor: "Anthropic", api_model: "claude-fable-5-5",
+    id: "claude-fable-5-2", label: "Claude Fable 5.2", vendor: "Anthropic", api_model: "claude-fable-5-2",
     transport: "anthropic_messages",
-    description: "偏创意叙事与故事化表达。上游当前返回不可用,暂不能选用。",
-    status: "unavailable",
-    status_reason: "上游 model_not_available,未静默替换为其它型号",
-    supports_vision: true, supports_documents: true, supports_tools: false,
+    description: "叙事与创意表达见长,适合故事化语篇、绘本脚本与情境对话改写。",
+    status: "ok", supports_vision: true, supports_documents: true, supports_tools: true,
     context_window: 200000, max_output_tokens: 32000,
     thinking: { kind: "anthropic_budget", budgets: { fast: 0, standard: 2048, deep: 8192, ultra: 32000 } },
   },
@@ -102,6 +100,18 @@ export const MODELS: ChatModelSpec[] = [
     id: "gemini-4-argon", label: "Gemini 4 Argon", vendor: "Google", api_model: "gemini-4-argon",
     transport: "google_gemini",
     description: "多模态强、上下文长,适合带图分析与整册材料检索式问答。",
+    status: "ok", supports_vision: true, supports_documents: true, supports_tools: true,
+    context_window: 1000000, max_output_tokens: 32768,
+    thinking: {
+      kind: "gemini", mode: "budget",
+      levels: { fast: "low", standard: "low", deep: "high", ultra: "high" },
+      budgets: { fast: 0, standard: 2048, deep: 8192, ultra: 24576 },
+    },
+  },
+  {
+    id: "gemini-4-carbon", label: "Gemini 4 Carbon", vendor: "Google", api_model: "gemini-4-carbon",
+    transport: "google_gemini",
+    description: "新一代多模态长上下文,适合整册材料问答与带图分析。",
     status: "ok", supports_vision: true, supports_documents: true, supports_tools: true,
     context_window: 1000000, max_output_tokens: 32768,
     thinking: {
