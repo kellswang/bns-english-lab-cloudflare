@@ -43,6 +43,14 @@ jobs:
       - name: Sensitive-info scan (no real names / keys / school domain)
         run: node scripts/predeploy-check.mjs
 
+      - name: Prepare wrangler config from example (dummy values, no secrets)
+        working-directory: apps/worker
+        # wrangler.jsonc 被 .gitignore 排除(每个年级填自家真实 ID)，CI 里没有配置文件，
+        # wrangler 会退回「自动框架检测」并对 Hono 直接报错。这里用示例模板合成一份
+        # 只含占位值的配置，专供 dry-run 校验配置结构与打包产物，不触达任何真实资源。
+        run: |
+          node -e 'const fs=require("fs");let s=fs.readFileSync("wrangler.jsonc.example","utf8");s=s.replace(/<grade>/g,"ci").replace(/<[^<>]*>/g,"ci-placeholder");fs.writeFileSync("wrangler.jsonc",s);'
+
       - name: Wrangler config dry-run (no deploy, no credentials)
         run: npx wrangler deploy --dry-run --outdir=dist-check
         working-directory: apps/worker
