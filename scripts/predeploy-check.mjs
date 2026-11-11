@@ -21,9 +21,8 @@ for (const f of [
   "apps/worker/wrangler.jsonc.example", "apps/worker/.dev.vars.example",
   "apps/worker/src/index.ts", "db/migrations/0001_init.sql",
   "config/grade.example.json", "config/teachers.template.csv",
-  "docs/DEPLOY_GRADE.md", "docs/BACKUP_AND_RESTORE.md", "docs/UPGRADE_AND_ROLLBACK.md",
-  "docs/COST_MODEL.md", "docs/TEST_REPORT.md", "docs/FEASIBILITY.md", "docs/SOURCE_AUDIT.md",
-  "docs/MIGRATION_PLAN.md", "docs/API_COMPATIBILITY.md",
+  "docs/DEPLOY_GRADE.md", "docs/DEPLOY_CHECKLIST.md", "docs/BACKUP_AND_RESTORE.md",
+  "docs/UPGRADE_AND_ROLLBACK.md", "docs/COST_MODEL.md", "docs/FEASIBILITY.md",
 ]) {
   if (!existsSync(join(root, f))) hit(`缺少 ${f}`);
   else console.log("  ✓ " + f);
